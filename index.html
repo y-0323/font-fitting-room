@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>フォント試着室 — Font Fitting Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4f2ee; --panel: #ffffff; --ink: #1a1a1a; --ink-soft: #6b6660;
+    --line: #e3ded6; --accent: #c2410c; --card-bg: #ffffff;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05); --radius: 14px;
+  }
+  [data-preview="dark"] { --card-bg: #16151a; --card-ink: #f5f3ee; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased; line-height: 1.5;
+  }
+  header.bar {
+    position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
+    padding: 14px 24px; background: rgba(244,242,238,.85);
+    backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: .01em; }
+  .brand span { font-size: 12px; color: var(--ink-soft); letter-spacing: .12em; text-transform: uppercase; }
+  .stat { font-size: 11px; color: var(--ink-soft); align-self: center; }
+
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 9px; font-size: 13px; font-weight: 500; transition: all .15s ease; }
+  .btn { padding: 9px 14px; background: var(--ink); color: #fff; }
+  .btn:hover { transform: translateY(-1px); opacity: .9; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover { background: #fff; border-color: #cfc8bd; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: #fff; }
+  .seg button { border-radius: 0; background: transparent; color: var(--ink-soft); padding: 8px 12px; }
+  .seg button.on { background: var(--ink); color: #fff; }
+
+  .sample { padding: 16px 24px 4px; }
+  .sample-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 240px; }
+  .field label { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 5px; }
+  .field input, .field textarea {
+    width: 100%; font-family: inherit; font-size: 14px; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: vertical;
+  }
+  .field input:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .swatch { display: inline-flex; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); overflow: hidden; cursor: pointer; position: relative; }
+  .swatch input { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); border: none; padding: 0; cursor: pointer; background: none; }
+  .icon-btn.star { color: #d9a300; }
+  .icon-btn.star:hover { background: #fbf2d4; }
+  .toolbar { display: flex; gap: 10px; padding: 14px 24px 0; position: relative; }
+  #favPanel { display: none; position: absolute; top: calc(100% + 6px); left: 24px; z-index: 40; width: 320px; max-width: 90vw; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.18); overflow: hidden; }
+  #favPanel.open { display: block; }
+  #favPanel .fav-head { font-size: 11px; color: var(--ink-soft); padding: 12px 14px 6px; letter-spacing: .08em; }
+  #favPanel .fav-list { max-height: 50vh; overflow-y: auto; padding: 4px 6px 8px; }
+  #favPanel .fav-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  #favPanel .fav-item:hover { background: var(--bg); }
+  #favPanel .fav-name { flex: 1; font-size: 13px; line-height: 1.35; overflow: hidden; }
+  #favPanel .fav-name b { font-weight: 600; }
+  #favPanel .fav-name span { color: var(--ink-soft); }
+  #favPanel .fav-del { color: var(--ink-soft); font-size: 12px; padding: 3px 6px; border-radius: 6px; }
+  #favPanel .fav-del:hover { background: var(--line); color: var(--ink); }
+  #favPanel .fav-empty { font-size: 12px; color: var(--ink-soft); padding: 10px 14px 16px; }
+  .stage { padding: 16px 24px 60px; }
+  .cards { display: flex; align-items: flex-start; gap: 18px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x proximity; }
+  .card {
+    scroll-snap-align: start; flex: 1 0 360px; max-width: 520px; min-width: 320px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+    transition: flex-basis .22s ease, max-width .22s ease, box-shadow .22s ease;
+  }
+  .card.expanded { box-shadow: 0 4px 12px rgba(0,0,0,.07), 0 16px 40px rgba(0,0,0,.1); }
+  .card-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .card-head .tag { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-right: auto; letter-spacing: .04em; }
+  .icon-btn { background: transparent; color: var(--ink-soft); padding: 5px 8px; border-radius: 7px; font-size: 13px; line-height: 1; }
+  .icon-btn:hover { background: var(--line); color: var(--ink); }
+  .icon-btn.add { color: var(--accent); font-weight: 700; }
+  .icon-btn.add:hover { background: var(--accent); color: #fff; }
+
+  .selects { display: flex; gap: 8px; padding: 12px 14px 0; }
+  .sel-wrap { flex: 1; min-width: 0; }
+  .sel-wrap > label { display:block; font-size: 10px; letter-spacing:.1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+  .picker-btn {
+    width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: 8px 9px; font-size: 13px; color: var(--ink);
+    display: flex; align-items: center; gap: 6px; overflow: hidden;
+  }
+  .picker-btn:hover { border-color: #cfc8bd; }
+  .picker-btn .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .picker-btn::after { content: "▾"; color: var(--ink-soft); font-size: 11px; flex: none; }
+
+  .preview { margin: 14px; padding: 26px 24px; border-radius: 10px; background: var(--card-bg); color: var(--card-ink, var(--ink)); flex: 1; min-height: 220px; overflow: hidden; transition: background .2s, color .2s; }
+  .preview .ph { margin: 0 0 .5em; } .preview .pb { margin: 0; }
+  .preview .body-block + .body-block { margin-top: 14px; }
+  .preview .blk-label { font-size: 10px; letter-spacing: .12em; margin-bottom: 4px; opacity: .45; }
+  .preview .cover-note { margin-top: 16px; font-size: 11px; line-height: 1.5; color: #d2691e; background: rgba(210,105,30,.1); padding: 7px 10px; border-radius: 7px; }
+
+  .controls { padding: 0 14px 12px; }
+  .controls summary { cursor: pointer; font-size: 12px; color: var(--ink-soft); padding: 8px 0; list-style: none; user-select: none; display: flex; align-items: center; gap: 6px; }
+  .controls summary::-webkit-details-marker { display: none; }
+  .controls summary::before { content: "▸"; transition: transform .15s; }
+  .controls[open] summary::before { transform: rotate(90deg); }
+  .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; padding: 6px 2px 4px; }
+  .ctrl { font-size: 11px; color: var(--ink-soft); }
+  .ctrl .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .ctrl .val { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 500; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  .card-foot { display: flex; gap: 8px; padding: 0 14px 14px; }
+  .card-foot .btn { flex: 1; text-align: center; }
+
+  .empty { color: var(--ink-soft); font-size: 13px; padding: 40px; text-align: center; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none; transition: all .25s; z-index: 80; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* picker popover */
+  #pop { position: fixed; z-index: 50; width: 340px; max-width: 92vw; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.18); display: none; flex-direction: column; overflow: hidden; }
+  #pop.open { display: flex; }
+  #pop .psearch { padding: 10px; border-bottom: 1px solid var(--line); }
+  #pop .psearch input { width: 100%; font-family: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; }
+  #pop .psearch input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #pop .plist { overflow-y: auto; max-height: 52vh; padding: 6px; }
+  #pop .pgroup { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); padding: 10px 8px 4px; position: sticky; top: 0; background: var(--panel); }
+  #pop .pitem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1.3; }
+  #pop .pitem:hover { background: var(--bg); }
+  #pop .pitem .pnm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pop .pmore { font-size: 11px; color: var(--ink-soft); padding: 8px 10px; }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><h1>フォント試着室</h1><span>Font Fitting Room</span></div>
+    <span class="stat" id="stat">読み込み中…</span>
+    <span class="stat">おまかせ:</span>
+    <div class="seg" id="modeSeg"><button data-mode="curated" class="on">厳選</button><button data-mode="random">ランダム</button></div>
+    <button class="btn ghost" id="shareBtn">🔗 共有リンク</button>
+    <div class="seg" id="bgSeg"><button data-bg="light" class="on">Light</button><button data-bg="dark">Dark</button></div>
+    <label class="swatch" title="背景色を自由に指定"><input type="color" id="bgColor" value="#eef0f4" /></label>
+  </header>
+
+  <section class="sample">
+    <div class="sample-grid">
+      <div class="field" style="flex:0 0 320px;">
+        <label>見出しテキスト</label>
+        <input id="headText" value="新しい働き方をデザインする" />
+      </div>
+      <div class="field">
+        <label>本文テキスト</label>
+        <textarea id="bodyText" rows="2">フォントの組み合わせひとつで、文章の印象は大きく変わります。The quick brown fox jumps over the lazy dog. 1234567890</textarea>
+      </div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <button class="btn" id="addBtn">＋ カードを追加</button>
+    <button class="btn ghost" id="shuffleBtn">⇄ おまかせ</button>
+    <button class="btn ghost" id="favBtn">★ お気に入り</button>
+    <div id="favPanel"></div>
+  </div>
+
+  <section class="stage"><div class="cards" id="cards"></div></section>
+
+  <div id="pop">
+    <div class="psearch"><input id="psearchInput" type="text" placeholder="フォント名で検索（無料フォント）" /></div>
+    <div class="plist" id="plist"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Data: free fonts only (Google Fonts) ---------------- */
+let CATALOG = [];            // {name, jp, gf, cat}
+let nameMap = {};
+const loaded = new Set();
+
+const CJK = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/;
+// split body text into Japanese vs Latin (英数字) portions, preserving order within each
+const JPCHAR = /[　-ヿ㐀-鿿豈-﫿＀-￯]/;
+function splitScripts(text) {
+  let jp = "", lat = "";
+  for (const ch of text) { if (JPCHAR.test(ch)) jp += ch; else lat += ch; }
+  return { jp: jp.replace(/\s+/g, " ").trim(), latin: lat.replace(/\s+/g, " ").trim() };
+}
+function loadFont(name) {
+  const f = nameMap[name];
+  if (!f || !f.gf || loaded.has(name)) return;
+  loaded.add(name);
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;
+  document.head.appendChild(link);
+}
+
+// all free Google Fonts pairings
+const PAIRS = [
+  ["Noto Serif JP","Noto Sans JP"],["Zen Old Mincho","Zen Kaku Gothic New"],["Shippori Mincho","BIZ UDPGothic"],
+  ["Dela Gothic One","M PLUS 1p"],["Zen Maru Gothic","M PLUS Rounded 1c"],["Kaisei Decol","Zen Kaku Gothic New"],
+  ["Yuji Syuku","Shippori Mincho"],["Playfair Display","Lora"],["Montserrat","Lora"],
+  ["DM Serif Display","Inter"],["Oswald","Work Sans"],["Space Grotesk","Inter"],
+];
+const okPairs = () => PAIRS.filter(p => nameMap[p[0]] && nameMap[p[1]]);
+let randomMode = false;
+function randomPair() {
+  if (randomMode && CATALOG.length) {
+    const r = () => CATALOG[Math.floor(Math.random() * CATALOG.length)].name;
+    return [r(), r()];
+  }
+  const ps = okPairs();
+  return ps[Math.floor(Math.random() * ps.length)] || ["Noto Sans JP", "Noto Serif JP"];
+}
+
+function buildCatalog(goog) {
+  CATALOG = goog.map(g => ({ name: g.name, jp: g.jp, gf: g.gf, cat: g.cat }));
+  nameMap = Object.fromEntries(CATALOG.map(f => [f.name, f]));
+  document.getElementById("stat").textContent = `無料フォント ${CATALOG.length} 書体（Google Fonts）`;
+}
+function ensureFont(name) {
+  if (nameMap[name]) return;
+  const e = { name, jp: CJK.test(name), gf: name.replace(/ /g, "+") + ":wght@400;700", cat: "sans-serif" };
+  CATALOG.push(e); nameMap[name] = e;
+}
+
+/* ---------------- State ---------------- */
+let cards = [];
+let uid = 0;
+const elCards = document.getElementById("cards");
+function defaultCard(head, body) { return { id: ++uid, head, body, hSize: 30, bSize: 16, hWeight: 700, bWeight: 400, lh: 1.7, ls: 0.02 }; }
+function newCard() { const p = randomPair(); return defaultCard(p[0], p[1]); }
+function genericFor(name) {
+  const f = nameMap[name]; if (!f) return "sans-serif";
+  if (f.jp) return "serif";
+  return (f.cat === "serif" || f.cat === "display" || f.cat === "handwriting") ? "serif" : "sans-serif";
+}
+
+/* ---------------- Picker ---------------- */
+const pop = document.getElementById("pop"), plist = document.getElementById("plist"), psearch = document.getElementById("psearchInput");
+let pickTarget = null;
+const GORDER = ["和文（日本語対応）", "欧文"];
+function groupFor(f) { return f.jp ? "和文（日本語対応）" : "欧文"; }
+const BATCH = 100;
+let plState = { flat: [], shown: 0 };
+function makeFontItem(f) {
+  const it = document.createElement("div"); it.className = "pitem";
+  const nm = document.createElement("span"); nm.className = "pnm"; nm.textContent = f.name;
+  it.appendChild(nm);
+  it.onmouseenter = () => { loadFont(f.name); nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`; };
+  it.onclick = () => { if (pickTarget) pickTarget(f.name); closePop(); };
+  return it;
+}
+function appendBatch() {
+  const { flat, shown } = plState;
+  const end = Math.min(shown + BATCH, flat.length);
+  const frag = document.createDocumentFragment();
+  for (let i = shown; i < end; i++) {
+    const item = flat[i];
+    if (item.type === "group") { const h = document.createElement("div"); h.className = "pgroup"; h.textContent = item.label; frag.appendChild(h); }
+    else if (item.type === "empty") { const e = document.createElement("div"); e.className = "pmore"; e.textContent = "該当なし"; frag.appendChild(e); }
+    else frag.appendChild(makeFontItem(item.f));
+  }
+  plist.appendChild(frag);
+  plState.shown = end;
+}
+function renderList(q) {
+  q = (q || "").trim().toLowerCase();
+  const groups = { "和文（日本語対応）": [], "欧文": [] };
+  for (const f of CATALOG) {
+    if (q && !f.name.toLowerCase().includes(q)) continue;
+    groups[groupFor(f)].push(f);
+  }
+  const flat = [];
+  for (const gname of GORDER) {
+    const all = groups[gname]; if (!all.length) continue;
+    flat.push({ type: "group", label: `${gname}（${all.length}）` });
+    for (const f of all) flat.push({ type: "font", f });
+  }
+  if (!flat.length) flat.push({ type: "empty" });
+  plState = { flat, shown: 0 };
+  plist.innerHTML = ""; plist.scrollTop = 0;
+  appendBatch();
+}
+plist.addEventListener("scroll", () => {
+  if (plState.shown < plState.flat.length && plist.scrollTop + plist.clientHeight >= plist.scrollHeight - 240) appendBatch();
+});
+function openPop(anchor, cb) {
+  pickTarget = cb;
+  const r = anchor.getBoundingClientRect(), w = 340, vw = innerWidth, vh = innerHeight;
+  pop.style.left = Math.max(12, Math.min(r.left, vw - w - 12)) + "px";
+  pop.style.top = Math.min(r.bottom + 6, vh - 60) + "px";
+  pop.classList.add("open"); psearch.value = ""; renderList(""); setTimeout(() => psearch.focus(), 0);
+}
+function closePop() { pop.classList.remove("open"); pickTarget = null; }
+psearch.addEventListener("input", () => renderList(psearch.value));
+document.addEventListener("mousedown", e => { if (pop.classList.contains("open") && !pop.contains(e.target) && !e.target.closest(".picker-btn")) closePop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+
+/* ---------------- Cards render ---------------- */
+function pickerButton(value, onPick) {
+  const btn = document.createElement("button"); btn.className = "picker-btn"; btn.type = "button";
+  const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = value;
+  btn.appendChild(nm); btn.onclick = () => openPop(btn, onPick); return btn;
+}
+function slider(label, min, max, step, value, unit, onInput) {
+  const wrap = document.createElement("div"); wrap.className = "ctrl";
+  wrap.innerHTML = `<div class="row"><span>${label}</span><span class="val"></span></div>`;
+  const valEl = wrap.querySelector(".val");
+  const inp = document.createElement("input"); inp.type = "range"; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
+  const fmt = v => unit === "x" ? Number(v).toFixed(2) : (unit === "em" ? Number(v).toFixed(3)+"em" : v+unit);
+  valEl.textContent = fmt(value);
+  inp.addEventListener("input", () => { valEl.textContent = fmt(inp.value); onInput(parseFloat(inp.value)); });
+  wrap.appendChild(inp); return wrap;
+}
+function render() {
+  elCards.innerHTML = "";
+  if (!cards.length) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.textContent = "カードがありません。";
+    const b = document.createElement("button"); b.className = "btn"; b.textContent = "＋ カードを追加"; b.style.marginLeft = "10px";
+    b.onclick = () => { cards.push(newCard()); render(); };
+    e.appendChild(b); elCards.appendChild(e); saveState(); return;
+  }
+  const headText = document.getElementById("headText").value, bodyText = document.getElementById("bodyText").value;
+  cards.forEach((c, i) => {
+    loadFont(c.head); loadFont(c.body);
+    const card = document.createElement("div"); card.className = "card";
+    const head = document.createElement("div"); head.className = "card-head";
+    head.innerHTML = `<span class="tag">案 ${String.fromCharCode(65 + i)}</span>`;
+    const fav = document.createElement("button"); fav.className = "icon-btn star"; fav.title = "この組み合わせをお気に入りに保存"; fav.textContent = "★";
+    fav.onclick = () => addFav(c);
+    const rm = document.createElement("button"); rm.className = "icon-btn"; rm.title = "削除"; rm.textContent = "✕";
+    rm.onclick = () => { cards.splice(i, 1); render(); };
+    head.append(fav, rm);
+
+    const selects = document.createElement("div"); selects.className = "selects";
+    const hWrap = document.createElement("div"); hWrap.className = "sel-wrap"; hWrap.innerHTML = "<label>見出し</label>";
+    hWrap.appendChild(pickerButton(c.head, v => { c.head = v; loadFont(v); render(); }));
+    const bWrap = document.createElement("div"); bWrap.className = "sel-wrap"; bWrap.innerHTML = "<label>本文</label>";
+    bWrap.appendChild(pickerButton(c.body, v => { c.body = v; loadFont(v); render(); }));
+    selects.append(hWrap, bWrap);
+
+    const prev = document.createElement("div"); prev.className = "preview";
+    const ph = document.createElement("p"); ph.className = "ph";
+    ph.style.cssText = `font-family:'${c.head}',${genericFor(c.head)};font-size:${c.hSize}px;font-weight:${c.hWeight};line-height:1.3;letter-spacing:${c.ls}em;`;
+    ph.textContent = headText;
+    prev.appendChild(ph);
+    const bodyStyle = `font-family:'${c.body}',${genericFor(c.body)};font-size:${c.bSize}px;font-weight:${c.bWeight};line-height:${c.lh};letter-spacing:${c.ls}em;`;
+    const mkBody = (label, text) => {
+      const wrap = document.createElement("div"); wrap.className = "body-block";
+      if (label) { const l = document.createElement("div"); l.className = "blk-label"; l.textContent = label; wrap.appendChild(l); }
+      const p = document.createElement("p"); p.className = "pb"; p.style.cssText = bodyStyle; p.textContent = text; wrap.appendChild(p);
+      return wrap;
+    };
+    const parts = splitScripts(bodyText);
+    if (parts.jp && parts.latin) prev.append(mkBody("和文", parts.jp), mkBody("欧文", parts.latin));
+    else prev.append(mkBody("", bodyText));
+    const pbs = [...prev.querySelectorAll(".pb")];
+    const warnH = CJK.test(headText) && nameMap[c.head] && !nameMap[c.head].jp;
+    const warnB = CJK.test(bodyText) && nameMap[c.body] && !nameMap[c.body].jp;
+    if (warnH || warnB) {
+      const w = document.createElement("div"); w.className = "cover-note";
+      const which = [warnH && "見出し", warnB && "本文"].filter(Boolean).join("・");
+      w.textContent = `⚠ ${which}は欧文専用フォントです。和文は別書体で代替表示されています（英数字のみ反映）`;
+      prev.appendChild(w);
+    }
+
+    const ctrl = document.createElement("details"); ctrl.className = "controls"; ctrl.innerHTML = "<summary>詳細を調整</summary>";
+    ctrl.addEventListener("toggle", () => card.classList.toggle("expanded", ctrl.open));
+    const grid = document.createElement("div"); grid.className = "ctrl-grid";
+    grid.append(
+      slider("見出しサイズ", 16, 80, 1, c.hSize, "px", v => { c.hSize = v; ph.style.fontSize = v+"px"; }),
+      slider("本文サイズ", 11, 28, 1, c.bSize, "px", v => { c.bSize = v; pbs.forEach(pb => pb.style.fontSize = v+"px"); }),
+      slider("見出し太さ", 100, 900, 100, c.hWeight, "", v => { c.hWeight = v; ph.style.fontWeight = v; }),
+      slider("本文太さ", 100, 900, 100, c.bWeight, "", v => { c.bWeight = v; pbs.forEach(pb => pb.style.fontWeight = v); }),
+      slider("行間", 1.0, 2.4, 0.05, c.lh, "x", v => { c.lh = v; pbs.forEach(pb => pb.style.lineHeight = v); }),
+      slider("字間", -0.05, 0.3, 0.005, c.ls, "em", v => { c.ls = v; ph.style.letterSpacing = v+"em"; pbs.forEach(pb => pb.style.letterSpacing = v+"em"); }),
+    );
+    ctrl.appendChild(grid);
+
+    const foot = document.createElement("div"); foot.className = "card-foot";
+    const cssBtn = document.createElement("button"); cssBtn.className = "btn ghost"; cssBtn.textContent = "CSSをコピー"; cssBtn.onclick = () => copyCSS(c);
+    const imgBtn = document.createElement("button"); imgBtn.className = "btn ghost"; imgBtn.textContent = "画像で保存"; imgBtn.onclick = () => exportImage(c, i);
+    foot.append(cssBtn, imgBtn);
+
+    card.append(head, selects, prev, ctrl, foot);
+    elCards.appendChild(card);
+  });
+  saveState();
+}
+
+function gfLink(name) {
+  const f = nameMap[name]; if (!f || !f.gf) return "";
+  return "https://fonts.google.com/specimen/" + name.replace(/ /g, "+");
+}
+function copyCSS(c) {
+  const css =
+`/* Google Fonts を読み込み */
+@import url('https://fonts.googleapis.com/css2?family=${nameMap[c.head]?.gf || ""}&family=${nameMap[c.body]?.gf || ""}&display=swap');
+
+/* 見出し */
+h1, h2, .heading {
+  font-family: "${c.head}", ${genericFor(c.head)};
+  font-size: ${c.hSize}px;
+  font-weight: ${c.hWeight};
+  letter-spacing: ${c.ls}em;
+  line-height: 1.3;
+}
+/* 本文 */
+body, p, .body {
+  font-family: "${c.body}", ${genericFor(c.body)};
+  font-size: ${c.bSize}px;
+  font-weight: ${c.bWeight};
+  letter-spacing: ${c.ls}em;
+  line-height: ${c.lh};
+}`;
+  navigator.clipboard.writeText(css).then(() => toast("CSSをコピーしました ✓（@importで即使えます）")).catch(() => toast("コピーできませんでした"));
+}
+
+/* ---------------- Image export ---------------- */
+function wrapText(ctx, text, maxW) {
+  const lines = []; let line = "";
+  for (const ch of text) {
+    if (ch === "\n") { lines.push(line); line = ""; continue; }
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = ch; } else line = test;
+  }
+  if (line) lines.push(line); return lines;
+}
+async function exportImage(c, idx) {
+  const bg = curBg, ink = curInk;
+  const S = 2, W = 760, padX = 56, padY = 52, maxW = W - padX*2;
+  const headText = document.getElementById("headText").value, bodyText = document.getElementById("bodyText").value;
+  try {
+    await document.fonts.load(`${c.hWeight} ${c.hSize}px "${c.head}"`);
+    await document.fonts.load(`${c.bWeight} ${c.bSize}px "${c.body}"`);
+  } catch (e) {}
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = `${c.hWeight} ${c.hSize}px "${c.head}", ${genericFor(c.head)}`;
+  const hLines = wrapText(measure, headText, maxW), hLH = c.hSize * 1.3;
+  measure.font = `${c.bWeight} ${c.bSize}px "${c.body}", ${genericFor(c.body)}`;
+  const bLines = wrapText(measure, bodyText, maxW), bLH = c.bSize * c.lh;
+  const H = padY*2 + hLines.length*hLH + 26 + bLines.length*bLH + 30;
+
+  const cv = document.createElement("canvas"); cv.width = W*S; cv.height = H*S;
+  const ctx = cv.getContext("2d"); ctx.scale(S, S);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = "top"; ctx.fillStyle = ink;
+  let y = padY;
+  ctx.font = `${c.hWeight} ${c.hSize}px "${c.head}", ${genericFor(c.head)}`;
+  for (const ln of hLines) { ctx.fillText(ln, padX, y); y += hLH; }
+  y += 26;
+  ctx.font = `${c.bWeight} ${c.bSize}px "${c.body}", ${genericFor(c.body)}`;
+  for (const ln of bLines) { ctx.fillText(ln, padX, y); y += bLH; }
+  ctx.fillStyle = ink; ctx.globalAlpha = .45; ctx.font = `500 12px "Inter", sans-serif`;
+  ctx.fillText(`見出し: ${c.head}  /  本文: ${c.body}`, padX, H - 30); ctx.globalAlpha = 1;
+
+  const a = document.createElement("a");
+  a.download = `font-pairing-${String.fromCharCode(65+idx)}.png`;
+  a.href = cv.toDataURL("image/png"); a.click();
+  toast("画像を書き出しました ✓");
+}
+
+/* ---------------- Background ---------------- */
+let bgMode = "light", bgColor = "#eef0f4", curBg = "#ffffff", curInk = "#1a1a1a";
+function inkFor(hex) {
+  const m = hex.replace("#", ""); if (m.length < 6) return "#1a1a1a";
+  const r = parseInt(m.substr(0,2),16), g = parseInt(m.substr(2,2),16), b = parseInt(m.substr(4,2),16);
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.58 ? "#1a1a1a" : "#f5f3ee";
+}
+function applyBg() {
+  if (bgMode === "dark") { curBg = "#16151a"; curInk = "#f5f3ee"; }
+  else if (bgMode === "custom") { curBg = bgColor; curInk = inkFor(bgColor); }
+  else { curBg = "#ffffff"; curInk = "#1a1a1a"; }
+  document.documentElement.style.setProperty("--card-bg", curBg);
+  document.documentElement.style.setProperty("--card-ink", curInk);
+  [...document.getElementById("bgSeg").children].forEach(x => x.classList.toggle("on", bgMode !== "custom" && x.dataset.bg === bgMode));
+}
+
+/* ---------------- State: share link + autosave ---------------- */
+function getState() {
+  return {
+    h: document.getElementById("headText").value,
+    b: document.getElementById("bodyText").value,
+    bg: { mode: bgMode, color: bgColor },
+    mode: randomMode ? "random" : "curated",
+    c: cards.map(c => [c.head, c.body, c.hSize, c.bSize, c.hWeight, c.bWeight, c.lh, c.ls]),
+  };
+}
+function applyState(st) {
+  try {
+    document.getElementById("headText").value = st.h ?? "";
+    document.getElementById("bodyText").value = st.b ?? "";
+    if (st.bg) { if (typeof st.bg === "string") bgMode = st.bg; else { bgMode = st.bg.mode || "light"; if (st.bg.color) bgColor = st.bg.color; } }
+    document.getElementById("bgColor").value = bgColor; applyBg();
+    if (st.mode === "random") { randomMode = true; [...document.getElementById("modeSeg").children].forEach(x => x.classList.toggle("on", x.dataset.mode === "random")); }
+    cards = (st.c || []).map(a => { ensureFont(a[0]); ensureFont(a[1]); return { id: ++uid, head: a[0], body: a[1], hSize: a[2], bSize: a[3], hWeight: a[4], bWeight: a[5], lh: a[6], ls: a[7] }; });
+    return cards.length > 0;
+  } catch (e) { return false; }
+}
+function buildShare() { return location.origin + location.pathname + "#s=" + encodeURIComponent(JSON.stringify(getState())); }
+function applyShare() { const m = location.hash.match(/s=([^&]+)/); if (!m) return false; try { return applyState(JSON.parse(decodeURIComponent(m[1]))); } catch (e) { return false; } }
+function saveState() { try { localStorage.setItem("ffr_state", JSON.stringify(getState())); } catch (e) {} }
+function restoreState() { try { const s = localStorage.getItem("ffr_state"); return s ? applyState(JSON.parse(s)) : false; } catch (e) { return false; } }
+
+/* ---------------- Favorites ---------------- */
+let favs = [];
+function loadFavs() { try { favs = JSON.parse(localStorage.getItem("ffr_favs")) || []; } catch (e) { favs = []; } }
+function saveFavs() { try { localStorage.setItem("ffr_favs", JSON.stringify(favs)); } catch (e) {} }
+function updateFavCount() { document.getElementById("favBtn").textContent = `★ お気に入り${favs.length ? `（${favs.length}）` : ""}`; }
+function addFav(c) {
+  if (favs.some(f => f.head === c.head && f.body === c.body)) { toast("すでにお気に入りにあります"); return; }
+  favs.unshift({ head: c.head, body: c.body, hSize: c.hSize, bSize: c.bSize, hWeight: c.hWeight, bWeight: c.bWeight, lh: c.lh, ls: c.ls });
+  saveFavs(); updateFavCount(); toast("★ お気に入りに保存しました");
+}
+function renderFavPanel() {
+  const p = document.getElementById("favPanel"); p.innerHTML = "";
+  const h = document.createElement("div"); h.className = "fav-head"; h.textContent = "保存した組み合わせ（クリックでカード追加）"; p.appendChild(h);
+  if (!favs.length) { const e = document.createElement("div"); e.className = "fav-empty"; e.textContent = "まだありません。各カードの ★ で保存できます。"; p.appendChild(e); return; }
+  const list = document.createElement("div"); list.className = "fav-list";
+  favs.forEach((f, idx) => {
+    loadFont(f.head); loadFont(f.body);
+    const it = document.createElement("div"); it.className = "fav-item";
+    const nm = document.createElement("div"); nm.className = "fav-name";
+    const b1 = document.createElement("b"); b1.textContent = f.head; b1.style.fontFamily = `"${f.head}", ${genericFor(f.head)}`;
+    const x = document.createElement("span"); x.textContent = " × ";
+    const b2 = document.createElement("b"); b2.textContent = f.body; b2.style.fontFamily = `"${f.body}", ${genericFor(f.body)}`;
+    nm.append(b1, x, b2);
+    nm.onclick = () => { cards.push({ id: ++uid, ...f }); render(); closeFav(); toast("カードに追加しました"); };
+    const del = document.createElement("button"); del.className = "fav-del"; del.textContent = "✕"; del.title = "削除";
+    del.onclick = e => { e.stopPropagation(); favs.splice(idx, 1); saveFavs(); updateFavCount(); renderFavPanel(); };
+    it.append(nm, del); list.appendChild(it);
+  });
+  p.appendChild(list);
+}
+function openFav() { renderFavPanel(); document.getElementById("favPanel").classList.add("open"); }
+function closeFav() { document.getElementById("favPanel").classList.remove("open"); }
+
+let toastTimer;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1900); }
+
+/* ---------------- Header events ---------------- */
+document.getElementById("addBtn").onclick = () => { cards.push(newCard()); render(); };
+document.getElementById("shuffleBtn").onclick = () => {
+  if (!cards.length) { cards = [newCard(), newCard(), newCard()]; }
+  else cards.forEach(c => { const p = randomPair(); c.head = p[0]; c.body = p[1]; loadFont(c.head); loadFont(c.body); });
+  render();
+};
+document.getElementById("shareBtn").onclick = () => { const url = buildShare(); navigator.clipboard.writeText(url).then(() => toast("共有リンクをコピーしました ✓ 誰の環境でも同じ表示で開けます")).catch(() => prompt("このリンクをコピーしてください", url)); };
+document.getElementById("headText").addEventListener("input", render);
+document.getElementById("bodyText").addEventListener("input", render);
+document.getElementById("bgSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; bgMode = b.dataset.bg; applyBg(); saveState(); });
+document.getElementById("bgColor").addEventListener("input", e => { bgMode = "custom"; bgColor = e.target.value; applyBg(); saveState(); });
+document.getElementById("modeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; [...e.currentTarget.children].forEach(x => x.classList.remove("on")); b.classList.add("on"); randomMode = b.dataset.mode === "random"; saveState(); });
+document.getElementById("favBtn").onclick = e => { e.stopPropagation(); const p = document.getElementById("favPanel"); p.classList.contains("open") ? closeFav() : openFav(); };
+document.addEventListener("mousedown", e => { const p = document.getElementById("favPanel"); if (p.classList.contains("open") && !p.contains(e.target) && !e.target.closest("#favBtn")) closeFav(); });
+
+/* ---------------- Init ---------------- */
+async function boot() {
+  let goog;
+  try { goog = await fetch("google-fonts.json").then(r => r.json()); }
+  catch (e) { document.getElementById("stat").textContent = "フォント一覧の読み込みに失敗しました"; console.error(e); return; }
+  buildCatalog(goog);
+  loadFavs(); updateFavCount();
+  if (!applyShare() && !restoreState()) {
+    cards = [defaultCard("Noto Serif JP","Noto Sans JP"), defaultCard("Zen Old Mincho","Zen Kaku Gothic New"), defaultCard("Playfair Display","Lora")];
+  }
+  applyBg();
+  render();
+}
+boot();
+</script>
+</body>
+</html>
