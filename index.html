@@ -131,6 +131,27 @@
   #pop .pitem:hover { background: var(--bg); }
   #pop .pitem .pnm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #pop .pmore { font-size: 11px; color: var(--ink-soft); padding: 8px 10px; }
+  .src { font-size: 9px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 5px; flex: none; }
+  .src.pc { background: #e9f1ff; color: #2d5bb8; }
+  .picker-btn .src { margin-right: 2px; }
+
+  /* modal */
+  .overlay { position: fixed; inset: 0; background: rgba(20,18,15,.45); z-index: 70; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--panel); border-radius: 16px; width: 520px; max-width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .modal-h { display: flex; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .modal-h h2 { font-size: 16px; margin: 0; margin-right: auto; }
+  .modal-b { padding: 20px; }
+  .modal-b h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; }
+  .modal-b p { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin: 8px 0; }
+  .divider { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 11px; margin: 20px 0; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .dropzone { border: 2px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; color: var(--ink-soft); font-size: 13px; cursor: pointer; transition: all .15s; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: #fff7f3; color: var(--ink); }
+  code.cmd { display: block; background: #16151a; color: #e8e4dc; padding: 10px 12px; border-radius: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.5; margin: 6px 0; white-space: pre-wrap; word-break: break-all; }
+  .myfonts-status { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .myfonts-status b { font-size: 15px; }
+  details.howto summary { cursor: pointer; font-size: 12px; color: var(--accent); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -139,6 +160,7 @@
     <span class="stat" id="stat">読み込み中…</span>
     <span class="stat">おまかせ:</span>
     <div class="seg" id="modeSeg"><button data-mode="curated" class="on">厳選</button><button data-mode="random">ランダム</button></div>
+    <button class="btn ghost" id="myFontsBtn">⬚ マイフォント</button>
     <button class="btn ghost" id="shareBtn">🔗 共有リンク</button>
     <div class="seg" id="bgSeg"><button data-bg="light" class="on">Light</button><button data-bg="dark">Dark</button></div>
     <label class="swatch" title="背景色を自由に指定"><input type="color" id="bgColor" value="#eef0f4" /></label>
@@ -171,15 +193,53 @@
     <div class="plist" id="plist"></div>
   </div>
 
+  <div class="overlay" id="myOverlay">
+    <div class="modal">
+      <div class="modal-h"><h2>PCのフォントを取り込む</h2><button class="icon-btn" id="myClose">✕</button></div>
+      <div class="modal-b">
+        <p>あなたのPCに入っているフォントを取り込むと、候補に追加され <b>実物の見た目でプレビュー</b> できます。取り込んだ一覧はこのブラウザに保存され、次回からは不要です。</p>
+        <p style="color:#c2410c">※ 取り込んだフォントは <b>このPCでのみ表示</b> されます。公開URLを他の人が開いても、その人のPCに同じフォントが無ければ表示されません（自分の試着用）。</p>
+
+        <h3>① CSV / テキストを取り込む</h3>
+        <div class="dropzone" id="dropzone">フォント名の入ったCSV / テキストを<br>ここにドラッグ、またはクリックして選択</div>
+        <input type="file" id="fileInput" accept=".csv,.txt,.tsv" style="display:none" />
+        <details class="howto"><summary>CSVの作り方（Mac / Windows）</summary>
+          <p><b>Mac（ターミナル）:</b></p>
+          <code class="cmd">system_profiler SPFontsDataType | grep "Family:" | sed 's/.*Family: //' | sort -u &gt; my-fonts.csv</code>
+          <p><b>Windows（PowerShell）:</b></p>
+          <code class="cmd">[void][System.Reflection.Assembly]::LoadWithPartialName("System.Drawing"); (New-Object System.Drawing.Text.InstalledFontCollection).Families.Name | Sort-Object -Unique | Out-File my-fonts.csv</code>
+          <p>1行1フォント名、またはカンマ区切りでOK。</p>
+        </details>
+
+        <div class="divider">または</div>
+
+        <h3>② Chromeでワンクリック取り込み</h3>
+        <p>CSVだと名前だけのため、モリサワ等の一部フォントがChromeで表示されないことがあります。こちらは正式名も取得するので確実です。</p>
+        <button class="btn" id="queryBtn">このPCのフォントを読み込む</button>
+        <p id="queryNote"></p>
+
+        <div class="divider"></div>
+        <div class="myfonts-status">
+          <span>現在のマイフォント：<b id="myCount">0</b> 書体</span>
+          <button class="btn ghost" id="clearMy" style="margin-left:auto">すべて消去</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
 <script>
-/* ---------------- Data: free fonts only (Google Fonts) ---------------- */
-let CATALOG = [];            // {name, jp, gf, cat}
+/* ---------------- Data: Google Fonts (free) + imported PC fonts ---------------- */
+let CATALOG = [];            // {name, source:'google'|'pc', jp, gf?, cat?, full?}
 let nameMap = {};
+let GOOGLE = [];
+let googleMap = {};
 const loaded = new Set();
 
 const CJK = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/;
+const JP_KW = ["Hiragino","BIZ UD","Shippori","Zen ","Klee","Kiwi","Osaka","Toppan","Tsukushi","YuGothic","Yu Gothic","Yu Mincho","YuMincho","YuKyokasho","A-OTF","FOT-","AB-","Hina Mincho","Kaisei","Mochiy","Murecho","Noto Sans JP","Noto Serif JP","M PLUS","Sawarabi","RocknRoll","DotGothic","Reggae","Rampart","Yomogi","Yusei","Stick","Train","リュウミン","じゅん","明朝","ゴシック","丸ゴ","角ゴ","教科書","行書","楷書","太","中","細"];
+function isJP(name) { return CJK.test(name) || JP_KW.some(k => name.includes(k)); }
 // split body text into Japanese vs Latin (英数字) portions, preserving order within each
 const JPCHAR = /[　-ヿ㐀-鿿豈-﫿＀-￯]/;
 function splitScripts(text) {
@@ -215,16 +275,57 @@ function randomPair() {
   return ps[Math.floor(Math.random() * ps.length)] || ["Noto Sans JP", "Noto Serif JP"];
 }
 
-function buildCatalog(goog) {
-  CATALOG = goog.map(g => ({ name: g.name, jp: g.jp, gf: g.gf, cat: g.cat }));
+function buildCatalog() {
+  CATALOG = []; const seen = new Set();
+  for (const m of myFonts) { if (!seen.has(m.name)) { CATALOG.push({ name: m.name, source: "pc", jp: m.jp, full: m.full || [] }); seen.add(m.name); } }
+  for (const g of GOOGLE) { if (!seen.has(g.name)) { CATALOG.push({ name: g.name, source: "google", jp: g.jp, gf: g.gf, cat: g.cat }); seen.add(g.name); } }
   nameMap = Object.fromEntries(CATALOG.map(f => [f.name, f]));
-  document.getElementById("stat").textContent = `無料フォント ${CATALOG.length} 書体（Google Fonts）`;
+  injectFaceCSS();
+  updateStat();
+}
+function updateStat() {
+  const pc = CATALOG.filter(f => f.source === "pc").length, g = CATALOG.filter(f => f.source === "google").length;
+  document.getElementById("stat").textContent = pc ? `PC内 ${pc} ＋ 無料 ${g} 書体` : `無料フォント ${g} 書体（Google Fonts）`;
+  const mc = document.getElementById("myCount"); if (mc) mc.textContent = myFonts.length;
+}
+/* Force exact resolution of installed PC fonts via local() (helps Morisawa/CID) */
+function injectFaceCSS() {
+  let s = document.getElementById("pcfaces"); if (!s) { s = document.createElement("style"); s.id = "pcfaces"; document.head.appendChild(s); }
+  const esc = x => x.replace(/"/g, '\\"');
+  const rules = [];
+  for (const f of CATALOG) {
+    if (f.source !== "pc") continue;
+    const names = (f.full && f.full.length) ? [...f.full, f.name] : [f.name];
+    rules.push(`@font-face{font-family:"${esc(f.name)}";src:${names.map(n => `local("${esc(n)}")`).join(", ")};}`);
+  }
+  s.textContent = rules.join("\n");
 }
 function ensureFont(name) {
   if (nameMap[name]) return;
-  const e = { name, jp: CJK.test(name), gf: name.replace(/ /g, "+") + ":wght@400;700", cat: "sans-serif" };
+  const e = googleMap[name]
+    ? { name, source: "google", jp: googleMap[name].jp, gf: googleMap[name].gf, cat: googleMap[name].cat }
+    : { name, source: "pc", jp: isJP(name), full: [] };
   CATALOG.push(e); nameMap[name] = e;
 }
+
+/* ---------------- My Fonts (PC import) ---------------- */
+const MYKEY = "ffr_myfonts";
+let myFonts = [];
+function loadMy() { try { myFonts = JSON.parse(localStorage.getItem(MYKEY)) || []; } catch (e) { myFonts = []; } }
+function saveMy() { try { localStorage.setItem(MYKEY, JSON.stringify(myFonts)); } catch (e) {} }
+function addFonts(items) { // items: [{name, full?}]
+  const have = new Set(myFonts.map(m => m.name));
+  let added = 0;
+  for (const it of items) {
+    const n = (it.name || "").trim();
+    if (!n || n.startsWith(".") || have.has(n) || /^family$|^name$|^font$/i.test(n)) continue;
+    have.add(n); myFonts.push({ name: n, jp: isJP(n), full: it.full || [] }); added++;
+  }
+  if (added) { myFonts.sort((a, b) => a.name.localeCompare(b.name, "ja")); saveMy(); buildCatalog(); render(); }
+  return added;
+}
+function addFontNames(names) { return addFonts(names.map(n => ({ name: n }))); }
+function parseCSV(text) { return text.split(/[\r\n]+/).flatMap(l => l.split(",")).map(s => s.replace(/^["']|["']$/g, "").trim()); }
 
 /* ---------------- State ---------------- */
 let cards = [];
@@ -241,15 +342,17 @@ function genericFor(name) {
 /* ---------------- Picker ---------------- */
 const pop = document.getElementById("pop"), plist = document.getElementById("plist"), psearch = document.getElementById("psearchInput");
 let pickTarget = null;
-const GORDER = ["和文（日本語対応）", "欧文"];
-function groupFor(f) { return f.jp ? "和文（日本語対応）" : "欧文"; }
+const GORDER = ["PC内 — 和文", "PC内 — 欧文", "Google — 和文", "Google — 欧文"];
+function groupFor(f) { return f.source === "pc" ? (f.jp ? "PC内 — 和文" : "PC内 — 欧文") : (f.jp ? "Google — 和文" : "Google — 欧文"); }
 const BATCH = 100;
 let plState = { flat: [], shown: 0 };
 function makeFontItem(f) {
   const it = document.createElement("div"); it.className = "pitem";
   const nm = document.createElement("span"); nm.className = "pnm"; nm.textContent = f.name;
   it.appendChild(nm);
-  it.onmouseenter = () => { loadFont(f.name); nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`; };
+  if (f.source === "pc") nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`;
+  else it.onmouseenter = () => { loadFont(f.name); nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`; };
+  if (f.source === "pc") { const b = document.createElement("span"); b.className = "src pc"; b.textContent = "PC"; it.appendChild(b); }
   it.onclick = () => { if (pickTarget) pickTarget(f.name); closePop(); };
   return it;
 }
@@ -268,7 +371,7 @@ function appendBatch() {
 }
 function renderList(q) {
   q = (q || "").trim().toLowerCase();
-  const groups = { "和文（日本語対応）": [], "欧文": [] };
+  const groups = {}; for (const g of GORDER) groups[g] = [];
   for (const f of CATALOG) {
     if (q && !f.name.toLowerCase().includes(q)) continue;
     groups[groupFor(f)].push(f);
@@ -303,7 +406,9 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); 
 function pickerButton(value, onPick) {
   const btn = document.createElement("button"); btn.className = "picker-btn"; btn.type = "button";
   const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = value;
-  btn.appendChild(nm); btn.onclick = () => openPop(btn, onPick); return btn;
+  btn.appendChild(nm);
+  if (nameMap[value] && nameMap[value].source === "pc") { const b = document.createElement("span"); b.className = "src pc"; b.textContent = "PC"; btn.appendChild(b); }
+  btn.onclick = () => openPop(btn, onPick); return btn;
 }
 function slider(label, min, max, step, value, unit, onInput) {
   const wrap = document.createElement("div"); wrap.className = "ctrl";
@@ -558,12 +663,38 @@ document.getElementById("modeSeg").addEventListener("click", e => { const b = e.
 document.getElementById("favBtn").onclick = e => { e.stopPropagation(); const p = document.getElementById("favPanel"); p.classList.contains("open") ? closeFav() : openFav(); };
 document.addEventListener("mousedown", e => { const p = document.getElementById("favPanel"); if (p.classList.contains("open") && !p.contains(e.target) && !e.target.closest("#favBtn")) closeFav(); });
 
+/* ---------------- My Fonts modal ---------------- */
+const myOverlay = document.getElementById("myOverlay");
+document.getElementById("myFontsBtn").onclick = () => { updateStat(); myOverlay.classList.add("open"); };
+document.getElementById("myClose").onclick = () => myOverlay.classList.remove("open");
+myOverlay.addEventListener("mousedown", e => { if (e.target === myOverlay) myOverlay.classList.remove("open"); });
+document.getElementById("clearMy").onclick = () => { if (confirm("マイフォントの登録をすべて消去しますか？")) { myFonts = []; saveMy(); buildCatalog(); render(); toast("消去しました"); } };
+const dz = document.getElementById("dropzone"), fileInput = document.getElementById("fileInput");
+dz.onclick = () => fileInput.click();
+fileInput.onchange = () => { if (fileInput.files[0]) readFontFile(fileInput.files[0]); };
+["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+dz.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) readFontFile(f); });
+function readFontFile(file) { const r = new FileReader(); r.onload = () => { const n = addFontNames(parseCSV(r.result)); toast(n ? `${n} 書体を取り込みました ✓` : "新しいフォントはありませんでした"); updateStat(); }; r.readAsText(file); }
+const queryBtn = document.getElementById("queryBtn"), queryNote = document.getElementById("queryNote");
+if (!("queryLocalFonts" in window)) { queryBtn.disabled = true; queryNote.textContent = "※ このブラウザは未対応です（Chrome / Edge をご利用ください）。上のCSV取り込みが使えます。"; }
+queryBtn.onclick = async () => {
+  try {
+    const arr = await window.queryLocalFonts();
+    const byFam = new Map();
+    for (const f of arr) { if (!byFam.has(f.family)) byFam.set(f.family, new Set()); const s = byFam.get(f.family); if (f.fullName) s.add(f.fullName); if (f.postscriptName) s.add(f.postscriptName); }
+    const items = [...byFam].map(([name, set]) => ({ name, full: [...set].slice(0, 6) }));
+    const n = addFonts(items); toast(`${n} 書体を取り込みました ✓`); updateStat();
+  } catch (e) { queryNote.textContent = "読み込みがキャンセル/拒否されました。"; }
+};
+
 /* ---------------- Init ---------------- */
 async function boot() {
-  let goog;
-  try { goog = await fetch("google-fonts.json").then(r => r.json()); }
+  try { GOOGLE = await fetch("google-fonts.json").then(r => r.json()); }
   catch (e) { document.getElementById("stat").textContent = "フォント一覧の読み込みに失敗しました"; console.error(e); return; }
-  buildCatalog(goog);
+  googleMap = Object.fromEntries(GOOGLE.map(g => [g.name, g]));
+  loadMy();
+  buildCatalog();
   loadFavs(); updateFavCount();
   if (!applyShare() && !restoreState()) {
     cards = [defaultCard("Noto Serif JP","Noto Sans JP"), defaultCard("Zen Old Mincho","Zen Kaku Gothic New"), defaultCard("Playfair Display","Lora")];
