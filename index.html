@@ -133,6 +133,7 @@
   #pop .pmore { font-size: 11px; color: var(--ink-soft); padding: 8px 10px; }
   .src { font-size: 9px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 5px; flex: none; }
   .src.pc { background: #e9f1ff; color: #2d5bb8; }
+  .src.fs { background: #edf7ee; color: #1a7a3c; }
   .picker-btn .src { margin-right: 2px; }
 
   /* modal */
@@ -161,6 +162,7 @@
     <span class="stat">おまかせ:</span>
     <div class="seg" id="modeSeg"><button data-mode="curated" class="on">厳選</button><button data-mode="random">ランダム</button></div>
     <button class="btn ghost" id="myFontsBtn">⬚ マイフォント</button>
+    <div class="seg" id="cdnSeg" title="フォント配信CDNの切り替え（GoogleがブロックされるときはBunnyを使用）"><button data-cdn="google" class="on">Google</button><button data-cdn="bunny">Bunny</button></div>
     <button class="btn ghost" id="shareBtn">🔗 共有リンク</button>
     <div class="seg" id="bgSeg"><button data-bg="light" class="on">Light</button><button data-bg="dark">Dark</button></div>
     <label class="swatch" title="背景色を自由に指定"><input type="color" id="bgColor" value="#eef0f4" /></label>
@@ -230,11 +232,14 @@
   <div class="toast" id="toast"></div>
 
 <script>
-/* ---------------- Data: Google Fonts (free) + imported PC fonts ---------------- */
-let CATALOG = [];            // {name, source:'google'|'pc', jp, gf?, cat?, full?}
+/* ---------------- Data: Google + Fontshare + Bunny(fallback) + PC fonts ---------------- */
+let CATALOG = [];            // {name, source:'google'|'fontshare'|'pc', jp, gf?, slug?, cat?, full?}
 let nameMap = {};
 let GOOGLE = [];
 let googleMap = {};
+let FONTSHARE = [];
+let fontshareMap = {};
+let useBunny = false;  // CDN切り替えフラグ
 const loaded = new Set();
 
 const CJK = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/;
@@ -248,12 +253,16 @@ function splitScripts(text) {
   return { jp: jp.replace(/\s+/g, " ").trim(), latin: lat.replace(/\s+/g, " ").trim() };
 }
 function loadFont(name) {
-  const f = nameMap[name];
-  if (!f || !f.gf || loaded.has(name)) return;
+  const f = nameMap[name]; if (!f || loaded.has(name)) return;
   loaded.add(name);
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;
+  const link = document.createElement("link"); link.rel = "stylesheet";
+  if (f.source === "fontshare") {
+    const ws = (f.weights || [400]).join(",");
+    link.href = `https://api.fontshare.com/v2/css?f[]=${f.slug}@${ws}&display=swap`;
+  } else if (f.gf) {
+    const base = useBunny ? "https://fonts.bunny.net/css" : "https://fonts.googleapis.com/css2";
+    link.href = `${base}?family=${f.gf}&display=swap`;
+  } else return;
   document.head.appendChild(link);
 }
 
@@ -278,14 +287,22 @@ function randomPair() {
 function buildCatalog() {
   CATALOG = []; const seen = new Set();
   for (const m of myFonts) { if (!seen.has(m.name)) { CATALOG.push({ name: m.name, source: "pc", jp: m.jp, full: m.full || [] }); seen.add(m.name); } }
+  for (const f of FONTSHARE) { if (!seen.has(f.name)) { CATALOG.push({ name: f.name, source: "fontshare", jp: f.jp, slug: f.slug, weights: f.weights }); seen.add(f.name); } }
   for (const g of GOOGLE) { if (!seen.has(g.name)) { CATALOG.push({ name: g.name, source: "google", jp: g.jp, gf: g.gf, cat: g.cat }); seen.add(g.name); } }
   nameMap = Object.fromEntries(CATALOG.map(f => [f.name, f]));
   injectFaceCSS();
   updateStat();
 }
 function updateStat() {
-  const pc = CATALOG.filter(f => f.source === "pc").length, g = CATALOG.filter(f => f.source === "google").length;
-  document.getElementById("stat").textContent = pc ? `PC内 ${pc} ＋ 無料 ${g} 書体` : `無料フォント ${g} 書体（Google Fonts）`;
+  const pc = CATALOG.filter(f=>f.source==="pc").length;
+  const fs = CATALOG.filter(f=>f.source==="fontshare").length;
+  const g  = CATALOG.filter(f=>f.source==="google").length;
+  const cdnLabel = useBunny ? "Bunny Fonts" : "Google Fonts";
+  const parts = [];
+  if (pc) parts.push(`PC内 ${pc}`);
+  if (fs) parts.push(`Fontshare ${fs}`);
+  parts.push(`${cdnLabel} ${g}`);
+  document.getElementById("stat").textContent = parts.join(" ＋ ") + " 書体";
   const mc = document.getElementById("myCount"); if (mc) mc.textContent = myFonts.length;
 }
 /* Force exact resolution of installed PC fonts via local() (helps Morisawa/CID) */
@@ -304,6 +321,8 @@ function ensureFont(name) {
   if (nameMap[name]) return;
   const e = googleMap[name]
     ? { name, source: "google", jp: googleMap[name].jp, gf: googleMap[name].gf, cat: googleMap[name].cat }
+    : fontshareMap[name]
+    ? { name, source: "fontshare", jp: false, slug: fontshareMap[name].slug, weights: fontshareMap[name].weights }
     : { name, source: "pc", jp: isJP(name), full: [] };
   CATALOG.push(e); nameMap[name] = e;
 }
@@ -342,8 +361,12 @@ function genericFor(name) {
 /* ---------------- Picker ---------------- */
 const pop = document.getElementById("pop"), plist = document.getElementById("plist"), psearch = document.getElementById("psearchInput");
 let pickTarget = null;
-const GORDER = ["PC内 — 和文", "PC内 — 欧文", "Google — 和文", "Google — 欧文"];
-function groupFor(f) { return f.source === "pc" ? (f.jp ? "PC内 — 和文" : "PC内 — 欧文") : (f.jp ? "Google — 和文" : "Google — 欧文"); }
+const GORDER = ["PC内 — 和文", "PC内 — 欧文", "Fontshare — 欧文", "Google — 和文", "Google — 欧文"];
+function groupFor(f) {
+  if (f.source === "pc") return f.jp ? "PC内 — 和文" : "PC内 — 欧文";
+  if (f.source === "fontshare") return "Fontshare — 欧文";
+  return f.jp ? "Google — 和文" : "Google — 欧文";
+}
 const BATCH = 100;
 let plState = { flat: [], shown: 0 };
 function makeFontItem(f) {
@@ -353,6 +376,7 @@ function makeFontItem(f) {
   if (f.source === "pc") nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`;
   else it.onmouseenter = () => { loadFont(f.name); nm.style.fontFamily = `"${f.name}", ${genericFor(f.name)}`; };
   if (f.source === "pc") { const b = document.createElement("span"); b.className = "src pc"; b.textContent = "PC"; it.appendChild(b); }
+  else if (f.source === "fontshare") { const b = document.createElement("span"); b.className = "src fs"; b.textContent = "FS"; it.appendChild(b); }
   it.onclick = () => { if (pickTarget) pickTarget(f.name); closePop(); };
   return it;
 }
@@ -407,7 +431,9 @@ function pickerButton(value, onPick) {
   const btn = document.createElement("button"); btn.className = "picker-btn"; btn.type = "button";
   const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = value;
   btn.appendChild(nm);
-  if (nameMap[value] && nameMap[value].source === "pc") { const b = document.createElement("span"); b.className = "src pc"; b.textContent = "PC"; btn.appendChild(b); }
+  const src = nameMap[value]?.source;
+  if (src === "pc") { const b = document.createElement("span"); b.className = "src pc"; b.textContent = "PC"; btn.appendChild(b); }
+  else if (src === "fontshare") { const b = document.createElement("span"); b.className = "src fs"; b.textContent = "FS"; btn.appendChild(b); }
   btn.onclick = () => openPop(btn, onPick); return btn;
 }
 function slider(label, min, max, step, value, unit, onInput) {
@@ -658,6 +684,7 @@ document.getElementById("shareBtn").onclick = () => { const url = buildShare(); 
 document.getElementById("headText").addEventListener("input", render);
 document.getElementById("bodyText").addEventListener("input", render);
 document.getElementById("bgSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; bgMode = b.dataset.bg; applyBg(); saveState(); });
+document.getElementById("cdnSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; [...e.currentTarget.children].forEach(x => x.classList.remove("on")); b.classList.add("on"); useBunny = b.dataset.cdn === "bunny"; loaded.clear(); updateStat(); toast(useBunny ? "Bunny Fonts CDNに切り替えました" : "Google Fonts CDNに切り替えました"); render(); });
 document.getElementById("bgColor").addEventListener("input", e => { bgMode = "custom"; bgColor = e.target.value; applyBg(); saveState(); });
 document.getElementById("modeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; [...e.currentTarget.children].forEach(x => x.classList.remove("on")); b.classList.add("on"); randomMode = b.dataset.mode === "random"; saveState(); });
 document.getElementById("favBtn").onclick = e => { e.stopPropagation(); const p = document.getElementById("favPanel"); p.classList.contains("open") ? closeFav() : openFav(); };
@@ -690,9 +717,14 @@ queryBtn.onclick = async () => {
 
 /* ---------------- Init ---------------- */
 async function boot() {
-  try { GOOGLE = await fetch("google-fonts.json").then(r => r.json()); }
-  catch (e) { document.getElementById("stat").textContent = "フォント一覧の読み込みに失敗しました"; console.error(e); return; }
+  try {
+    [GOOGLE, FONTSHARE] = await Promise.all([
+      fetch("google-fonts.json").then(r => r.json()),
+      fetch("fontshare-fonts.json").then(r => r.json()).catch(() => []),
+    ]);
+  } catch (e) { document.getElementById("stat").textContent = "フォント一覧の読み込みに失敗しました"; console.error(e); return; }
   googleMap = Object.fromEntries(GOOGLE.map(g => [g.name, g]));
+  fontshareMap = Object.fromEntries(FONTSHARE.map(f => [f.name, f]));
   loadMy();
   buildCatalog();
   loadFavs(); updateFavCount();
